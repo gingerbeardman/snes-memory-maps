@@ -69,8 +69,8 @@ otherwise `allocated`.
 Point the tool at the symbol file each emits:
 
 ```sh
-# wla-dx: wlalink writes a WLA `.sym` ([labels]) next to the linked ROM
-wlalink -S -A linkfile.link mygame.sfc       # -> mygame.sym
+# wla-dx: wlalink -S writes a WLA `.sym` ([labels]) next to the linked ROM
+wlalink -S linkfile.link mygame.sfc          # -> mygame.sym  (-s = no$sns instead)
 rommap.py mygame.sym
 
 # asar: choose the WLA or no$sns symbol format
