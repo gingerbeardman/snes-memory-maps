@@ -13,7 +13,13 @@ The repository provides two command-line scripts:
 - `rammap.py` creates an address-preserving WRAM overview with low-WRAM and
   direct-page zooms.
 
-Both scripts use only the Python 3 standard library. Their SVG output supports
+Both are thin entry points to `snesmap.py`, the shared engine that does the map
+parsing, layout, and rendering; they simply preset ROM or RAM mode. Keeping one
+engine means the ~95% of logic the two maps share lives in a single place, while
+you still get the two commands you'd expect. (`snesmap.py` is not meant to be run
+directly.)
+
+All three use only the Python 3 standard library. Their SVG output supports
 light and dark colour schemes, browser zooming, and per-allocation tooltips.
 
 ## Examples
