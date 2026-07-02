@@ -113,6 +113,10 @@ All three are off by default.
 Use `--compiler "toolchain name"` to override the compiler/linker label embedded
 in the SVG footer.
 
+Use `--delimiter` to change the field separator used throughout the SVG — headers,
+tooltips, captions, and the footer (e.g. `$00 / 31,333 B / 95.6% full`). It is
+space-padded, and the default is a bullet (`·`), e.g. `--delimiter "/"`.
+
 ## Supported linker maps
 
 - llvm-mos/ld.lld map output, with ROM regions read from a GNU-style `MEMORY`

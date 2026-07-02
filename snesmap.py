@@ -41,6 +41,8 @@ parser.add_argument("--checkerboard", action="store_true",
                     help="draw checkerboard in free space (default: transparent)")
 parser.add_argument("--coloured-percentages", "--colored-percentages", action="store_true",
                     help="colour percentages amber/red near capacity (default: off)")
+parser.add_argument("--delimiter", default="·",
+                    help="separator between footer fields, space-padded (default: bullet, e.g. '/')")
 parser.add_argument("--map-kind", choices=("rom", "ram"), default=DEFAULT_MAP_KIND,
                     help=argparse.SUPPRESS)
 args = parser.parse_args()
@@ -49,6 +51,7 @@ MAP = os.path.abspath(args.map)
 LD = os.path.abspath(args.linker_script)
 MAP_KIND = args.map_kind
 TOOL_NAME = f"{MAP_KIND}map.py"
+TOOL_URL = "https://github.com/gingerbeardman/snes-memory-maps"
 default_prefix = os.path.join(ROOT, "build", f"{MAP_KIND}map")
 OUTPUT_PREFIX = args.output_prefix or default_prefix
 CSV_OUT = os.path.abspath(OUTPUT_PREFIX + ".csv")
@@ -56,6 +59,8 @@ SVG_OUT = os.path.abspath(OUTPUT_PREFIX + ".svg")
 SHOW_COLOUR_KEY = args.colour_key
 SHOW_CHECKERBOARD = args.checkerboard
 SHOW_COLOURED_PERCENTAGES = args.coloured_percentages
+SEP = f" {args.delimiter} "          # raw, space-padded field separator (for text later html.escape()'d)
+DELIM = html.escape(SEP)             # pre-escaped, for separators inserted directly into markup
 
 RAM_REGIONS = [
     ("direct_page", 0x000000, 0x0100),
@@ -479,9 +484,9 @@ def make_rom_svg(regions, entries):
     physical_used = sum(size for bank_entries in by_bank.values()
                         for _, _, _, size, _ in bank_entries)
     physical_percent = 100 * physical_used / (bank_count * bank_size)
-    layout_note = "4×4 physical bank grid · $00–$0F in reading order"
+    layout_note = f"4×4 physical bank grid{DELIM}$00–$0F in reading order"
     if fixed_entries:
-        layout_note += " · fixed region shown in $00/$03/$08"
+        layout_note += f"{DELIM}fixed region shown in $00/$03/$08"
 
     svg = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -500,7 +505,7 @@ def make_rom_svg(regions, entries):
         '<text x="16" y="29" class="title">SNES ROM MAP</text>',
         f'<text x="16" y="49" class="subtitle">{layout_note}</text>',
         f'<text x="{canvas_width - 16}" y="49" text-anchor="end" class="summary">'
-        f'{bank_count * bank_size:,} physical bytes · {physical_used:,} used · '
+        f'{bank_count * bank_size:,} physical bytes{DELIM}{physical_used:,} used{DELIM}'
         f'{capacity_tspan(f"{physical_percent:.1f}% full", physical_percent)}</text>',
         '<style>',
         '  :root { color-scheme: dark light; }',
@@ -558,7 +563,7 @@ def make_rom_svg(regions, entries):
         used = sum(size for _, _, _, size, _ in bank_entries)
         free = max(0, bank_size - used)
         percent_full = 100 * used / bank_size
-        title = f"${bank:02X} · {used:,}/{bank_size:,} B · {percent_full:.1f}% full"
+        title = f"${bank:02X}{SEP}{used:,}/{bank_size:,} B{SEP}{percent_full:.1f}% full"
 
         svg.append(f'<g><title>{html.escape(title)}</title>')
         svg.append(f'<rect class="region-border region-bg" x="{x:.2f}" y="{y:.2f}" '
@@ -568,7 +573,7 @@ def make_rom_svg(regions, entries):
                    f'fill="{base}"/>')
         svg.append(f'<text x="{x + 7:.2f}" y="{y + header_height - 7:.2f}" '
                    f'class="map-label" font-size="12" fill="{text_color(base)}">'
-                   f'{html.escape(f"${bank:02X} · {used:,} B")}</text>')
+                   f'{html.escape(f"${bank:02X}{SEP}{used:,} B")}</text>')
         svg.append(f'<text x="{x + width - 7:.2f}" y="{y + header_height - 7:.2f}" '
                    f'text-anchor="end" class="map-label" font-size="12" '
                    f'fill="{text_color(base)}">'
@@ -595,14 +600,14 @@ def make_rom_svg(regions, entries):
                 fill = vary_color(color_for_region(color_index), symbol)
                 foreground = text_color(fill)
                 label_class = "map-label"
-                tooltip = f"{symbol} · ${address:06X} · {size:,} B · {region}"
+                tooltip = f"{symbol}{SEP}${address:06X}{SEP}{size:,} B{SEP}{region}"
 
             svg.append(f'<g><title>{html.escape(tooltip)}</title>')
             svg.append(f'<rect class="item" x="{ix:.2f}" y="{iy:.2f}" '
                        f'width="{item_width:.2f}" height="{item_height:.2f}" '
                        f'fill="{fill}"/>')
 
-            full_label = f"{symbol} · {size:,} B"
+            full_label = f"{symbol}{SEP}{size:,} B"
             full_size = fitted_font_size(full_label, item_width, item_height)
             if full_size >= 12.0:
                 label, font_size = full_label, full_size
@@ -623,8 +628,8 @@ def make_rom_svg(regions, entries):
                             else "transparent = free space")
         svg.extend([
             f'<rect x="16" y="862" width="12" height="12" fill="{color_for_region(0)}"/>',
-            '<text x="34" y="872" class="subtitle">header colour = physical bank · '
-            'rectangle colour = linker region · shade = symbol</text>',
+            f'<text x="34" y="872" class="subtitle">header colour = physical bank{DELIM}'
+            f'rectangle colour = linker region{DELIM}shade = symbol</text>',
             f'<rect x="720" y="862" width="12" height="12" fill="{free_fill()}" '
             'stroke="#8f9baa"/>',
             f'<text x="738" y="872" class="subtitle">{free_description}</text>',
@@ -632,11 +637,11 @@ def make_rom_svg(regions, entries):
         if SHOW_COLOURED_PERCENTAGES:
             svg.append(
                 f'<text x="{canvas_width - 16}" y="891" text-anchor="end" '
-                'class="subtitle">capacity text: amber 75–89.9% · red 90%+</text>'
+                f'class="subtitle">capacity text: amber 75–89.9%{DELIM}red 90%+</text>'
             )
     svg.extend([
-        f'<text x="16" y="{footer_y}" class="subtitle">Generated by {TOOL_NAME} '
-        f'· compiler: {COMPILER_LABEL} · source: {html.escape(os.path.basename(MAP))}</text>',
+        f'<text x="16" y="{footer_y}" class="subtitle">Generated by {TOOL_URL}/{TOOL_NAME}'
+        f'{DELIM}compiler: {COMPILER_LABEL}{DELIM}source: {html.escape(os.path.basename(MAP))}</text>',
         '</svg>',
     ])
     return "\n".join(svg) + "\n"
@@ -719,10 +724,10 @@ def make_ram_svg(regions, entries):
         '</defs>',
         f'<rect width="{canvas_width}" height="{canvas_height}" class="background"/>',
         '<text x="16" y="29" class="title">SNES RAM MAP</text>',
-        '<text x="16" y="49" class="subtitle">true-scale 128 KiB overview · '
-        'address-preserving low-WRAM and direct-page zooms</text>',
+        f'<text x="16" y="49" class="subtitle">true-scale 128 KiB overview{DELIM}'
+        f'address-preserving low-WRAM and direct-page zooms</text>',
         f'<text x="{canvas_width - 16}" y="49" text-anchor="end" class="summary">'
-        f'{total_size:,} physical bytes · {total_used:,} statically reserved · '
+        f'{total_size:,} physical bytes{DELIM}{total_used:,} statically reserved{DELIM}'
         f'{capacity_tspan(f"{total_percent:.1f}%", total_percent)}</text>',
         '<style>',
         '  :root { color-scheme: dark light; }',
@@ -765,8 +770,8 @@ def make_ram_svg(regions, entries):
         allocations = range_entries(origin, length)
         used = used_in_range(origin, length)
         percent = 100 * used / length
-        header = f"{title} · {used:,}/{length:,} B · {percent:.1f}% reserved"
-        header_prefix = f"{title} · {used:,}/{length:,} B"
+        header = f"{title}{SEP}{used:,}/{length:,} B{SEP}{percent:.1f}% reserved"
+        header_prefix = f"{title}{SEP}{used:,}/{length:,} B"
         percentage_label = f"{percent:.1f}% reserved"
         content_x, content_y = x + 1.5, y + header_height
         content_width = max(0, width - 3)
@@ -799,15 +804,15 @@ def make_ram_svg(regions, entries):
                 f"{snes_address(address)}–{snes_address(address + size - 1)}"
             )
             if allocation == "free":
-                tooltip = f"unallocated · {address_range} · {size:,} B"
+                tooltip = f"unallocated{SEP}{address_range}{SEP}{size:,} B"
                 label_class = "map-label free-label"
-                full_label = f"UNALLOCATED · {address_range} · {size:,} B"
+                full_label = f"UNALLOCATED{SEP}{address_range}{SEP}{size:,} B"
             else:
                 tooltip = (
-                    f"{symbol} · {address_range} · {size:,} B · {allocation}"
+                    f"{symbol}{SEP}{address_range}{SEP}{size:,} B{SEP}{allocation}"
                 )
                 label_class = "map-label"
-                full_label = f"{symbol} · {size:,} B"
+                full_label = f"{symbol}{SEP}{size:,} B"
             svg.append(f'<g><title>{html.escape(tooltip)}</title>')
             svg.append(f'<rect class="item" x="{content_x:.2f}" y="{item_y:.2f}" '
                        f'width="{content_width:.2f}" height="{item_height:.2f}" '
@@ -831,7 +836,7 @@ def make_ram_svg(regions, entries):
                f'fill="{overview_color}"/>')
     svg.append(f'<text x="{map_x + 7}" y="{map_y + header_height - 9}" '
                f'class="map-label" font-size="12" fill="{text_color(overview_color)}">'
-               'FULL 128 KiB · TRUE SCALE</text>')
+               f'FULL 128 KiB{DELIM}TRUE SCALE</text>')
     bank_gap = 3
     bank_y = map_y + header_height
     bank_height = map_height - header_height
@@ -843,11 +848,11 @@ def make_ram_svg(regions, entries):
                        "$7F:0000–FFFF", color_for_region(1))
 
     draw_address_panel(detail_x, map_y, detail_width, low_height,
-                       0x7e0100, 0x1f00, "$7E:0100–1FFF · LOW WRAM ZOOM",
+                       0x7e0100, 0x1f00, f"$7E:0100–1FFF{SEP}LOW WRAM ZOOM",
                        color_for_region(1))
     draw_address_panel(detail_x, direct_y, detail_width, direct_height,
                        0x7e0000, 0x100,
-                       "$7E:0000–00FF · DEFAULT DIRECT PAGE (D=$0000) ZOOM",
+                       f"$7E:0000–00FF{SEP}DEFAULT DIRECT PAGE (D=$0000) ZOOM",
                        color_for_region(0))
 
     if SHOW_COLOUR_KEY:
@@ -871,12 +876,12 @@ def make_ram_svg(regions, entries):
         if SHOW_COLOURED_PERCENTAGES:
             svg.append(
                 f'<text x="{canvas_width - 16}" y="891" text-anchor="end" '
-                'class="subtitle">capacity text: amber 75–89.9% · red 90%+</text>'
+                f'class="subtitle">capacity text: amber 75–89.9%{DELIM}red 90%+</text>'
             )
 
     svg.extend([
-        f'<text x="16" y="891" class="subtitle">Generated by {TOOL_NAME} '
-        f'· compiler: {COMPILER_LABEL} · source: {html.escape(os.path.basename(MAP))}</text>',
+        f'<text x="16" y="891" class="subtitle">Generated by {TOOL_URL}/{TOOL_NAME}'
+        f'{DELIM}compiler: {COMPILER_LABEL}{DELIM}source: {html.escape(os.path.basename(MAP))}</text>',
         '</svg>',
     ])
     return "\n".join(svg) + "\n"
