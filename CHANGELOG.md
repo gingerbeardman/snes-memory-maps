@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- CSV output is now opt-in (`--csv`); SVG is written by default.
+
 ## 1.0.0 — 2026-07-02
 
 - Added physical-bank ROM SVG and CSV generation.

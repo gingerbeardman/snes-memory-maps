@@ -30,8 +30,14 @@ class CommandLineTests(unittest.TestCase):
         result = subprocess.run(command, check=True, text=True, capture_output=True)
         return prefix, result
 
+    def test_csv_is_opt_in(self):
+        # default: SVG only, no CSV
+        prefix, _ = self.run_tool("rommap.py")
+        self.assertTrue(prefix.with_suffix(".svg").exists())
+        self.assertFalse(prefix.with_suffix(".csv").exists())
+
     def test_rom_outputs_csv_and_valid_svg(self):
-        prefix, result = self.run_tool("rommap.py")
+        prefix, result = self.run_tool("rommap.py", "--csv")
         self.assertIn("93.8% allocated", result.stdout)
 
         with prefix.with_suffix(".csv").open(newline="") as stream:
@@ -44,7 +50,7 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual([], critical)
 
     def test_ram_outputs_classified_csv_and_valid_svg(self):
-        prefix, result = self.run_tool("rammap.py", include_linker=False)
+        prefix, result = self.run_tool("rammap.py", "--csv", include_linker=False)
         self.assertIn("356", result.stdout)
 
         with prefix.with_suffix(".csv").open(newline="") as stream:
@@ -73,14 +79,14 @@ class CommandLineTests(unittest.TestCase):
 
     def test_vlink_rom_and_ram_are_auto_detected(self):
         rom_prefix, _ = self.run_tool(
-            "rommap.py", include_linker=False, map_name="vlink.map"
+            "rommap.py", "--csv", include_linker=False, map_name="vlink.map"
         )
         with rom_prefix.with_suffix(".csv").open(newline="") as stream:
             rom_rows = list(csv.DictReader(stream))
         self.assertEqual(["main", "assets"], [row["symbol"] for row in rom_rows])
 
         ram_prefix, _ = self.run_tool(
-            "rammap.py", include_linker=False, map_name="vlink.map"
+            "rammap.py", "--csv", include_linker=False, map_name="vlink.map"
         )
         with ram_prefix.with_suffix(".csv").open(newline="") as stream:
             ram_rows = list(csv.DictReader(stream))

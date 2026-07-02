@@ -33,6 +33,8 @@ else:
 parser.add_argument("-o", "--output-prefix",
                     help="output prefix (default: build/rommap or build/rammap)")
 parser.add_argument("--compiler", help="compiler/linker label embedded in the SVG")
+parser.add_argument("--csv", action="store_true",
+                    help="also write the CSV map (default: SVG only)")
 parser.add_argument("--colour-key", "--color-key", action="store_true",
                     help="show colour legends in both SVGs (default: off)")
 parser.add_argument("--checkerboard", action="store_true",
@@ -312,31 +314,32 @@ if MAP_KIND == "ram" and not ram_rows:
 
 rows.sort(key=lambda r: r[1])
 ram_rows.sort(key=lambda r: r[1])
-os.makedirs(os.path.dirname(CSV_OUT), exist_ok=True)
-with open(CSV_OUT, "w", newline="") as f:
-    writer = csv.writer(f)
-    if MAP_KIND == "rom":
-        writer.writerow(["region", "addr_start", "addr_end", "size", "symbol"])
-        for region, address, size, symbol in rows:
-            writer.writerow([
-                region,
-                f"0x{address:06x}",
-                f"0x{address + size - 1:06x}",
-                size,
-                symbol,
-            ])
-    else:
-        writer.writerow(["region", "addr_start", "addr_end", "size", "allocation", "symbol"])
-        for region, address, size, symbol, allocation in ram_rows:
-            start = physical_ram_address(address)
-            writer.writerow([
-                region,
-                f"0x{start:06x}",
-                f"0x{start + size - 1:06x}",
-                size,
-                allocation,
-                symbol,
-            ])
+if args.csv:
+    os.makedirs(os.path.dirname(CSV_OUT), exist_ok=True)
+    with open(CSV_OUT, "w", newline="") as f:
+        writer = csv.writer(f)
+        if MAP_KIND == "rom":
+            writer.writerow(["region", "addr_start", "addr_end", "size", "symbol"])
+            for region, address, size, symbol in rows:
+                writer.writerow([
+                    region,
+                    f"0x{address:06x}",
+                    f"0x{address + size - 1:06x}",
+                    size,
+                    symbol,
+                ])
+        else:
+            writer.writerow(["region", "addr_start", "addr_end", "size", "allocation", "symbol"])
+            for region, address, size, symbol, allocation in ram_rows:
+                start = physical_ram_address(address)
+                writer.writerow([
+                    region,
+                    f"0x{start:06x}",
+                    f"0x{start + size - 1:06x}",
+                    size,
+                    allocation,
+                    symbol,
+                ])
 
 def squarify(items, x, y, width, height):
     """Return (item, x, y, width, height) rectangles using a squarified layout."""
@@ -889,8 +892,9 @@ else:
     entries = ram_rows
     regions = RAM_REGIONS
 
-print(f"wrote {CSV_OUT}  ({len(entries)} entries)")
-print(f"wrote {SVG_OUT}\n")
+if args.csv:
+    print(f"wrote {CSV_OUT}  ({len(entries)} entries)")
+print(f"wrote {SVG_OUT}  ({len(entries)} entries)\n")
 print(f"{'region':16} {'used':>8} {'capacity':>8} {'free':>8}")
 total_used = 0
 total_capacity = 0

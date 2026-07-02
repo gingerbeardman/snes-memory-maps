@@ -1,7 +1,7 @@
 # SNES Memory Maps
 
-Generate zoomable SVG and machine-readable CSV maps of SNES ROM and WRAM from
-linker map files.
+Generate zoomable SVG maps of SNES ROM and WRAM from linker map files, with
+optional machine-readable CSV output.
 
 The repository provides two command-line scripts:
 
@@ -35,14 +35,15 @@ python3 /path/to/rammap.py build/game.map \
   -o build/rammap
 ```
 
-Each command writes two files:
+Each command writes an SVG by default:
 
 ```text
-build/rommap.csv
 build/rommap.svg
-build/rammap.csv
 build/rammap.svg
 ```
+
+Pass `--csv` to also write the machine-readable CSV (`build/rommap.csv`,
+`build/rammap.csv`).
 
 The linker format is auto-detected. Override detection with `--format lld` or
 `--format vlink`.
