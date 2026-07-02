@@ -3,6 +3,10 @@
 Generate zoomable SVG maps of SNES ROM and WRAM from linker map files, with
 optional machine-readable CSV output.
 
+Supports both the [llvm-mos](https://github.com/llvm-mos/llvm-mos) (ld.lld) and
+[vbcc65816](http://www.compilers.de/vbcc.html) (vlink) toolchains; the map
+format is auto-detected.
+
 The repository provides two command-line scripts:
 
 - `rommap.py` creates a physical-bank ROM treemap.
