@@ -19,12 +19,14 @@ additional SNES toolchains.
    ```sh
    ./rommap.py tests/fixtures/game.map \
      --linker-script tests/fixtures/game.ld \
-     -o examples/rommap
+     --csv -o examples/rommap
 
    ./rammap.py tests/fixtures/game.map \
-     --linker-script tests/fixtures/game.ld \
-     -o examples/rammap
+     --csv -o examples/rammap
    ```
+
+   `--csv` keeps the example CSVs alongside the SVGs (CSV output is opt-in).
+   `rammap.py` reads only WRAM regions, so it takes no `--linker-script`.
 
 Please do not commit proprietary linker maps. Reduce new fixtures to the
 smallest synthetic example that demonstrates the format or bug.
