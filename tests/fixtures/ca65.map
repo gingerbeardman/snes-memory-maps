@@ -1,0 +1,27 @@
+Modules list:
+-------------
+fixture.o:
+    main              Offs=000000  Size=001000  Align=00001  Fill=0000
+    assets            Offs=000000  Size=006800  Align=00001  Fill=0000
+    DATA              Offs=000000  Size=000010  Align=00001  Fill=0000
+    BSS               Offs=000000  Size=000030  Align=00001  Fill=0000
+
+
+Segment list:
+-------------
+Name                   Start     End    Size  Align
+----------------------------------------------------
+main                  008000  008FFF  001000  00001
+assets                009000  00F7FF  006800  00001
+DATA                  000200  00020F  000010  00001
+BSS                   000210  00023F  000030  00001
+
+
+Exports list by name:
+---------------------
+assets                    009000 RLA   main                      008000 RLA
+
+
+Exports list by value:
+--------------------
+008000 RLA   main         009000 RLA   assets

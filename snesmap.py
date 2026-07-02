@@ -14,10 +14,11 @@ __version__ = "1.0.0"
 
 ROOT = os.getcwd()
 DEFAULT_MAP_KIND = os.environ.get("SNES_MEMORY_MAP_KIND", "rom")
+_KINDS = "ld.lld, vlink, ca65/ld65, wla-dx, or asar"
 DESCRIPTION = (
-    "Generate an SNES WRAM CSV/SVG map from an ld.lld or vlink linker map."
+    f"Generate an SNES WRAM CSV/SVG map from a {_KINDS} map or symbol file."
     if DEFAULT_MAP_KIND == "ram"
-    else "Generate an SNES ROM CSV/SVG map from an ld.lld or vlink linker map."
+    else f"Generate an SNES ROM CSV/SVG map from a {_KINDS} map or symbol file."
 )
 parser = argparse.ArgumentParser(
     prog=os.environ.get("SNES_MEMORY_MAP_PROGRAM"),
@@ -25,7 +26,9 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 parser.add_argument("map", nargs="?", default=os.path.join(ROOT, "build", "game.map"))
-parser.add_argument("--format", choices=("auto", "lld", "vlink"), default="auto")
+parser.add_argument("--format",
+                    choices=("auto", "lld", "vlink", "ca65", "wla", "asar"),
+                    default="auto")
 if DEFAULT_MAP_KIND == "rom":
     parser.add_argument("--linker-script", default=os.path.join(ROOT, "game.ld"))
 else:
@@ -281,16 +284,145 @@ def hirom_physical_address(address):
     bank, within = divmod(offset, 0x8000)
     return (bank << 16) | 0x8000 | within
 
+def _int_auto(token):
+    """Parse a $hex, 0xhex, or decimal integer literal."""
+    token = token.strip()
+    return int(token[1:], 16) if token.startswith("$") else int(token, 0)
+
+# --- ca65 / ld65 (cc65 suite) -------------------------------------------------
+# ld65 --mapfile emits a "Segment list:" table with EXACT per-segment sizes; the
+# ROM regions come from the cc65 linker config (.cfg) MEMORY {} areas, which use
+# `NAME: start = $.., size = $..;` (not GNU ld's ORIGIN/LENGTH). Leaves are
+# segments, so granularity is per-segment and sizes/free space are exact.
+def load_regions_ca65(cfg_path):
+    """Parse ROM memory areas from a cc65 linker-config MEMORY {} block."""
+    txt = re.sub(r"#.*", "", open(cfg_path).read())          # strip line comments
+    mem = re.search(r"MEMORY\s*\{(.*?)\n?\}", txt, re.S)
+    body = mem.group(1) if mem else txt
+    rx = re.compile(r"(\w+)\s*:\s*[^;{}]*?\bstart\s*=\s*(\$?\w+)"
+                    r"[^;{}]*?\bsize\s*=\s*(\$?\w+)", re.S)
+    out = []
+    for name, start, size in rx.findall(body):
+        origin = _int_auto(start)
+        if origin < 0x8000 or origin >> 16 in (0x7e, 0x7f):
+            continue
+        out.append((name, origin, _int_auto(size)))
+    return out
+
+def ca65_segments(text):
+    """Yield (name, start, size) rows from the ld65 map 'Segment list:' table."""
+    in_block = False
+    for line in text.splitlines():
+        if line.startswith("Segment list:"):
+            in_block = True
+            continue
+        if not in_block:
+            continue
+        if not line.strip():                 # blank line terminates the table
+            break
+        cols = line.split()
+        if len(cols) != 5:                   # skip the header + dashed underline
+            continue
+        name, start, _end, size, _align = cols
+        try:
+            yield name, int(start, 16), int(size, 16)
+        except ValueError:                   # the "Name Start End ..." header row
+            continue
+
+def parse_ca65(text, regions):
+    rows = []
+    for name, start, size in ca65_segments(text):
+        region = region_of(start, regions)
+        if region and size > 0 and start >= 0x8000:
+            rows.append((region, start, size, name))
+    return rows
+
+def parse_ca65_ram(text):
+    rows = []
+    for name, start, size in ca65_segments(text):
+        if size <= 0 or start >= 0x8000:
+            continue
+        address = ram_region_address(start)
+        region = region_of(address, RAM_REGIONS)
+        if not region:
+            continue
+        upper = name.upper()
+        allocation = ("bss" if "BSS" in upper or "ZP" in upper
+                      else "data" if "DATA" in upper else "allocated")
+        rows.append((region, address, size, name, allocation))
+    return rows
+
+# --- wla-dx / asar symbol files ----------------------------------------------
+# A wlalink/asar `.sym` lists label -> address only: no sizes, no memory regions.
+#   WLA "[labels]" format (wla-dx, asar --symbols=wla):  bb:aaaa  Label
+#   no$sns format          (asar --symbols=nocash):      bbaaaa   Label
+# Sizes are INFERRED as the gap to the next label; the last label in a region
+# runs to its end. LoROM physical banks are assumed, so sizes are APPROXIMATE
+# (trailing free space inside a region is absorbed by its final label).
+wla_label_re = re.compile(r"^\s*([0-9A-Fa-f]{2}):([0-9A-Fa-f]{4})\s+(\S.*?)\s*$")
+nocash_label_re = re.compile(r"^([0-9A-Fa-f]{6})\s+(\S.*?)\s*$")
+
+def parse_wla_labels(text):
+    """Return [(addr24, name)] from a WLA `[labels]` or no$sns symbol file."""
+    labels = []
+    section = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            section = stripped[1:-1].lower()
+            continue
+        if not stripped or stripped.startswith(";"):
+            continue
+        if section not in (None, "labels"):          # ignore [definitions] etc.
+            continue
+        m = wla_label_re.match(line)
+        if m:
+            labels.append(((int(m.group(1), 16) << 16) | int(m.group(2), 16),
+                           m.group(3)))
+            continue
+        m = nocash_label_re.match(line)
+        if m:
+            labels.append((int(m.group(1), 16), m.group(2)))
+    return labels
+
+def infer_sized_rows(labels, regions):
+    """Place labels into regions and infer each size as the gap to the next
+    label, with the final label in a region extended to the region end."""
+    ends = {name: origin + length for name, origin, length in regions}
+    by_region = {}
+    for address, name in labels:
+        region = region_of(address, regions)
+        if region:
+            by_region.setdefault(region, []).append((address, name))
+    rows = []
+    for region, entries in by_region.items():
+        entries.sort()
+        for index, (address, name) in enumerate(entries):
+            nxt = entries[index + 1][0] if index + 1 < len(entries) else ends[region]
+            if nxt - address > 0:
+                rows.append((region, address, nxt - address, name))
+    return rows
+
+def detect_format(text):
+    if "Section mapping (numbers in hex):" in text:
+        return "vlink"
+    if "Segment list:" in text:
+        return "ca65"
+    if "[labels]" in text:
+        return "wla"
+    # a no$sns symbol file is bare `address label` lines with no ld section syntax
+    if re.search(r"^[0-9A-Fa-f]{6} \S+$", text, re.M) and ":(." not in text:
+        return "asar"
+    return "lld"
+
 with open(MAP, encoding="utf-8", errors="replace") as stream:
     map_text = stream.read()
-if args.format == "auto":
-    MAP_FORMAT = "vlink" if "Section mapping (numbers in hex):" in map_text else "lld"
-else:
-    MAP_FORMAT = args.format
+MAP_FORMAT = detect_format(map_text) if args.format == "auto" else args.format
+ROM_BANKS = [(f"bank_{bank:02x}", (bank << 16) | 0x8000, 0x8000)
+             for bank in range(16)]
 
 if MAP_FORMAT == "vlink":
-    REGIONS = [(f"bank_{bank:02x}", (bank << 16) | 0x8000, 0x8000)
-               for bank in range(16)]
+    REGIONS = ROM_BANKS
     is_hirom = bool(re.search(r"^\s+00400000\s+-", map_text, re.M))
     rows = parse_vlink(map_text, REGIONS,
                        hirom_physical_address if is_hirom else None)
@@ -300,6 +432,24 @@ if MAP_FORMAT == "vlink":
         in parse_vlink(map_text, RAM_REGIONS, ram_region_address)
     ]
     COMPILER_LABEL = args.compiler or "vbcc65816/vlink"
+elif MAP_FORMAT == "ca65":
+    REGIONS = load_regions_ca65(LD) if MAP_KIND == "rom" else []
+    rows = parse_ca65(map_text, REGIONS) if MAP_KIND == "rom" else []
+    ram_rows = parse_ca65_ram(map_text)
+    COMPILER_LABEL = args.compiler or "ca65/ld65"
+elif MAP_FORMAT in ("wla", "asar"):
+    REGIONS = ROM_BANKS
+    labels = parse_wla_labels(map_text)
+    rom_labels = [(a, n) for a, n in labels
+                  if (a & 0xffff) >= 0x8000 and (a >> 16) < 0x7e]
+    rows = infer_sized_rows(rom_labels, ROM_BANKS)
+    ram_labels = [(ram_region_address(a), n) for a, n in labels
+                  if (a & 0xffff) < 0x8000 or (a >> 16) in (0x7e, 0x7f)]
+    ram_rows = [(region, address, size, symbol, "allocated")
+                for region, address, size, symbol
+                in infer_sized_rows(ram_labels, RAM_REGIONS)]
+    toolchain = "asar" if MAP_FORMAT == "asar" else "wla-dx/wlalink"
+    COMPILER_LABEL = args.compiler or f"{toolchain} (approx sizes)"
 else:
     if MAP_KIND == "rom":
         REGIONS = load_regions(LD)

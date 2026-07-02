@@ -41,6 +41,33 @@ For vlink RAM entries, allocation type is reported as `allocated` because the
 section mapping does not always retain enough portable information to
 distinguish initialization policy.
 
+## cc65 (ca65/ld65)
+
+Pass an `ld65 --mapfile` map. ROM regions come from the cc65 linker-config
+`MEMORY { NAME: start = $.., size = $..; }` block, supplied via `--linker-script`
+(the `.cfg`); `rammap.py` needs no config.
+
+Leaves are **segments**, read from the map's `Segment list:` table (`Name`,
+`Start`, `End`, `Size`, `Align`). Sizes and free space are therefore exact, at
+segment granularity — per-symbol sizes are not present in an ld65 map. RAM
+segments are classified by name: `*BSS*`/`*ZP*` → `bss`, `*DATA*` → `data`,
+otherwise `allocated`.
+
+## wla-dx and asar (symbol files)
+
+`wlalink` `.sym` files and `asar --symbols=wla|nocash` output list labels and
+their addresses only — no sizes and no memory layout. The tool therefore:
+
+- assumes a LoROM physical-bank layout (bank `$xx`, offset `$8000–$FFFF`);
+- infers each label's size as the gap to the next label, sorted per bank;
+- extends the last label in a bank to the bank end.
+
+Consequently **sizes are approximate**: trailing free space inside a bank is
+absorbed by that bank's final label, unlabeled data between labels is attributed
+to the preceding label, and the footer marks the map `(approx sizes)`. RAM
+labels are reported as `allocated`. No `--linker-script` is used. For exact
+sizes, use a linker map (ld.lld, vlink, or ld65) instead.
+
 ## ROM layout assumptions
 
 The current visualisation targets a sixteen-bank, 512 KiB physical ROM with

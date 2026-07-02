@@ -1,0 +1,11 @@
+; WLA-DX / wlalink symbol file fixture (bank:addr label). No sizes are stored,
+; so the tool infers them from label gaps (LoROM assumed; last label per region
+; runs to the region end).
+[labels]
+00:8000 main
+00:9000 assets
+00:0200 state
+00:0210 buffer
+
+[definitions]
+FIXTURE_BUILD 1

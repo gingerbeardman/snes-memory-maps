@@ -3,9 +3,12 @@
 Generate zoomable SVG maps of SNES ROM and WRAM from linker map files, with
 optional machine-readable CSV output.
 
-Supports both the [llvm-mos](https://github.com/llvm-mos/llvm-mos) (ld.lld) and
-[vbcc65816](http://www.compilers.de/vbcc.html) (vlink) toolchains; the map
-format is auto-detected.
+Supports [llvm-mos](https://github.com/llvm-mos/llvm-mos) (ld.lld),
+[vbcc65816](http://www.compilers.de/vbcc.html) (vlink), [cc65](https://cc65.github.io/)
+(ca65/ld65), [wla-dx](https://github.com/vhelin/wla-dx), and
+[asar](https://github.com/RPGHacker/asar); the input format is auto-detected.
+Linker maps carry exact sizes; assembler symbol files (wla-dx, asar) carry only
+addresses, so their sizes are inferred (see below).
 
 The repository provides two command-line scripts:
 
@@ -55,8 +58,8 @@ build/rammap.svg
 Pass `--csv` to also write the machine-readable CSV (`build/rommap.csv`,
 `build/rammap.csv`).
 
-The linker format is auto-detected. Override detection with `--format lld` or
-`--format vlink`.
+The format is auto-detected. Override detection with `--format`, one of `lld`,
+`vlink`, `ca65`, `wla`, or `asar`.
 
 ## ROM map
 
@@ -123,6 +126,14 @@ space-padded, and the default is a bullet (`·`), e.g. `--delimiter "/"`.
   block.
 - vbcc65816/vlink section mappings.
 - vlink LoROM, plus the vlink HiROM address projection used by `vlink-hi`.
+- cc65 ca65/ld65: the `ld65 --mapfile` **Segment list** for exact per-segment
+  sizes, with ROM regions read from the linker-config `MEMORY {}` block (pass the
+  `.cfg` as `--linker-script`).
+- wla-dx / asar symbol files (`wlalink` `.sym`, `asar --symbols=wla|nocash`):
+  label→address only, so LoROM physical banks are assumed and sizes are
+  **inferred** from label gaps (the last label in a bank runs to the bank end).
+  Trailing free space inside a bank is therefore invisible; the footer marks
+  these maps `(approx sizes)`.
 
 See [docs/linker-map-support.md](docs/linker-map-support.md) for assumptions and
 known limitations.
@@ -135,8 +146,9 @@ Run the test suite:
 python3 -m unittest discover -s tests -v
 ```
 
-The tests invoke both scripts against a small checked-in ld.lld fixture and
-validate their CSV and SVG output.
+The tests invoke both scripts against small checked-in fixtures for each
+supported format (ld.lld, vlink, ca65/ld65, wla-dx, and asar) and validate their
+CSV and SVG output.
 
 ## Acknowledgements
 

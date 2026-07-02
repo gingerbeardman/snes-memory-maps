@@ -94,5 +94,44 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual({"allocated"}, {row["allocation"] for row in ram_rows})
 
 
+    def test_ca65_segment_map_is_exact(self):
+        rom_prefix, result = self.run_tool(
+            "rommap.py", "--csv",
+            "--linker-script", str(FIXTURES / "ca65.cfg"),
+            include_linker=False, map_name="ca65.map",
+        )
+        self.assertIn("93.8% allocated", result.stdout)
+        with rom_prefix.with_suffix(".csv").open(newline="") as stream:
+            rom_rows = list(csv.DictReader(stream))
+        self.assertEqual(["main", "assets"], [row["symbol"] for row in rom_rows])
+        # segment sizes are read straight from the ld65 "Segment list", not inferred
+        self.assertEqual(["4096", "26624"], [row["size"] for row in rom_rows])
+
+        ram_prefix, _ = self.run_tool(
+            "rammap.py", "--csv", include_linker=False, map_name="ca65.map"
+        )
+        with ram_prefix.with_suffix(".csv").open(newline="") as stream:
+            allocations = {row["symbol"]: row["allocation"]
+                           for row in csv.DictReader(stream)}
+        self.assertEqual("data", allocations["DATA"])
+        self.assertEqual("bss", allocations["BSS"])
+
+    def test_wla_and_asar_symbol_files_infer_sizes(self):
+        for map_name, label in (("wla.sym", "wla-dx"), ("asar.sym", "asar")):
+            prefix, _ = self.run_tool(
+                "rommap.py", "--csv", include_linker=False, map_name=map_name
+            )
+            with prefix.with_suffix(".csv").open(newline="") as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual(["main", "assets"], [row["symbol"] for row in rows])
+            # a label's size is the exact gap to the next label...
+            self.assertEqual("4096", rows[0]["size"])
+            # ...and the final label in a bank is extended to the bank end.
+            self.assertEqual("28672", rows[1]["size"])
+            svg = prefix.with_suffix(".svg").read_text()
+            self.assertIn(label, svg)
+            self.assertIn("approx sizes", svg)
+
+
 if __name__ == "__main__":
     unittest.main()
