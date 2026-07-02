@@ -116,6 +116,38 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual("data", allocations["DATA"])
         self.assertEqual("bss", allocations["BSS"])
 
+    def run_expecting_error(self, script, *args):
+        """Run a script in an empty working directory and require a clean
+        non-zero exit (argparse error, not a traceback)."""
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        command = [sys.executable, str(ROOT / script), *args,
+                   "-o", str(Path(temporary.name) / "out")]
+        result = subprocess.run(command, cwd=temporary.name,
+                                text=True, capture_output=True)
+        self.assertNotEqual(0, result.returncode)
+        self.assertNotIn("Traceback", result.stderr)
+        return result
+
+    def test_ca65_map_works_without_a_linker_config(self):
+        # Regression: a ca65 map on its own must not crash on a missing game.ld;
+        # it falls back to LoROM physical banks (sizes stay exact).
+        prefix, _ = self.run_tool(
+            "rommap.py", "--csv", include_linker=False, map_name="ca65.map"
+        )
+        with prefix.with_suffix(".csv").open(newline="") as stream:
+            rows = list(csv.DictReader(stream))
+        self.assertEqual(["main", "assets"], [row["symbol"] for row in rows])
+        self.assertTrue(all(row["region"].startswith("bank_") for row in rows))
+
+    def test_missing_map_file_fails_cleanly(self):
+        result = self.run_expecting_error("rommap.py", "does-not-exist.map")
+        self.assertIn("cannot read map/symbol file", result.stderr)
+
+    def test_lld_rom_without_linker_script_fails_cleanly(self):
+        result = self.run_expecting_error("rommap.py", str(FIXTURES / "game.map"))
+        self.assertIn("--linker-script", result.stderr)
+
     def test_wla_and_asar_symbol_files_infer_sizes(self):
         for map_name, label in (("wla.sym", "wla-dx"), ("asar.sym", "asar")):
             prefix, _ = self.run_tool(

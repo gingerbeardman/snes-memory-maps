@@ -7,6 +7,7 @@ import argparse
 import colorsys
 import csv
 import html
+import io
 import os
 import re
 
@@ -65,6 +66,30 @@ SHOW_COLOURED_PERCENTAGES = args.coloured_percentages
 SEP = f" {args.delimiter} "          # raw, space-padded field separator (for text later html.escape()'d)
 DELIM = html.escape(SEP)             # pre-escaped, for separators inserted directly into markup
 
+
+def fail(message):
+    """Print `usage: ... error: <message>` to stderr and exit 2 (no traceback)."""
+    parser.error(message)
+
+def read_text(path, description):
+    """Read a file as text, failing cleanly if it is missing or unreadable."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as stream:
+            return stream.read()
+    except OSError as error:
+        fail(f"cannot read {description} '{path}': {error.strerror or error}")
+
+def write_output(path, content):
+    """Write generated output, creating parent directories, failing cleanly."""
+    directory = os.path.dirname(path)
+    try:
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as stream:
+            stream.write(content)
+    except OSError as error:
+        fail(f"cannot write '{path}': {error.strerror or error}")
+
 RAM_REGIONS = [
     ("direct_page", 0x000000, 0x0100),
     ("low_wram",    0x000100, 0x1f00),
@@ -83,7 +108,7 @@ RAM_COLORS = {
 def load_regions(ld_path):
     """Parse `name (attrs) : ORIGIN = 0x.., LENGTH = 0x..` from the MEMORY{} block.
     Keep ROM-located regions; skip low WRAM and banks $7E/$7F. Robust to comments."""
-    txt = open(ld_path).read()
+    txt = read_text(ld_path, "linker script")
     txt = re.sub(r"/\*.*?\*/", "", txt, flags=re.S)   # strip comments first
     mem = re.search(r"MEMORY\s*\{(.*?)\n\}", txt, re.S)
     body = mem.group(1) if mem else txt
@@ -296,7 +321,7 @@ def _int_auto(token):
 # segments, so granularity is per-segment and sizes/free space are exact.
 def load_regions_ca65(cfg_path):
     """Parse ROM memory areas from a cc65 linker-config MEMORY {} block."""
-    txt = re.sub(r"#.*", "", open(cfg_path).read())          # strip line comments
+    txt = re.sub(r"#.*", "", read_text(cfg_path, "cc65 linker config"))   # strip comments
     mem = re.search(r"MEMORY\s*\{(.*?)\n?\}", txt, re.S)
     body = mem.group(1) if mem else txt
     rx = re.compile(r"(\w+)\s*:\s*[^;{}]*?\bstart\s*=\s*(\$?\w+)"
@@ -415,8 +440,7 @@ def detect_format(text):
         return "asar"
     return "lld"
 
-with open(MAP, encoding="utf-8", errors="replace") as stream:
-    map_text = stream.read()
+map_text = read_text(MAP, "map/symbol file")
 MAP_FORMAT = detect_format(map_text) if args.format == "auto" else args.format
 ROM_BANKS = [(f"bank_{bank:02x}", (bank << 16) | 0x8000, 0x8000)
              for bank in range(16)]
@@ -433,8 +457,16 @@ if MAP_FORMAT == "vlink":
     ]
     COMPILER_LABEL = args.compiler or "vbcc65816/vlink"
 elif MAP_FORMAT == "ca65":
-    REGIONS = load_regions_ca65(LD) if MAP_KIND == "rom" else []
-    rows = parse_ca65(map_text, REGIONS) if MAP_KIND == "rom" else []
+    if MAP_KIND == "rom":
+        # The ld65 Segment list already carries exact Start+Size, so the cc65
+        # linker config is OPTIONAL: use its named MEMORY areas when a readable
+        # .cfg is given, otherwise fall back to LoROM physical banks.
+        cfg_regions = load_regions_ca65(LD) if os.path.isfile(LD) else []
+        REGIONS = cfg_regions or ROM_BANKS
+        rows = parse_ca65(map_text, REGIONS)
+    else:
+        REGIONS = []
+        rows = []
     ram_rows = parse_ca65_ram(map_text)
     COMPILER_LABEL = args.compiler or "ca65/ld65"
 elif MAP_FORMAT in ("wla", "asar"):
@@ -452,6 +484,9 @@ elif MAP_FORMAT in ("wla", "asar"):
     COMPILER_LABEL = args.compiler or f"{toolchain} (approx sizes)"
 else:
     if MAP_KIND == "rom":
+        if not os.path.isfile(LD):
+            fail("ld.lld ROM maps need the GNU-ld linker script; pass it with "
+                 f"--linker-script (looked for '{LD}')")
         REGIONS = load_regions(LD)
         rows = parse_lld(map_text, REGIONS)
     else:
@@ -470,31 +505,31 @@ if MAP_KIND == "ram" and not ram_rows:
 rows.sort(key=lambda r: r[1])
 ram_rows.sort(key=lambda r: r[1])
 if args.csv:
-    os.makedirs(os.path.dirname(CSV_OUT), exist_ok=True)
-    with open(CSV_OUT, "w", newline="") as f:
-        writer = csv.writer(f)
-        if MAP_KIND == "rom":
-            writer.writerow(["region", "addr_start", "addr_end", "size", "symbol"])
-            for region, address, size, symbol in rows:
-                writer.writerow([
-                    region,
-                    f"0x{address:06x}",
-                    f"0x{address + size - 1:06x}",
-                    size,
-                    symbol,
-                ])
-        else:
-            writer.writerow(["region", "addr_start", "addr_end", "size", "allocation", "symbol"])
-            for region, address, size, symbol, allocation in ram_rows:
-                start = physical_ram_address(address)
-                writer.writerow([
-                    region,
-                    f"0x{start:06x}",
-                    f"0x{start + size - 1:06x}",
-                    size,
-                    allocation,
-                    symbol,
-                ])
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    if MAP_KIND == "rom":
+        writer.writerow(["region", "addr_start", "addr_end", "size", "symbol"])
+        for region, address, size, symbol in rows:
+            writer.writerow([
+                region,
+                f"0x{address:06x}",
+                f"0x{address + size - 1:06x}",
+                size,
+                symbol,
+            ])
+    else:
+        writer.writerow(["region", "addr_start", "addr_end", "size", "allocation", "symbol"])
+        for region, address, size, symbol, allocation in ram_rows:
+            start = physical_ram_address(address)
+            writer.writerow([
+                region,
+                f"0x{start:06x}",
+                f"0x{start + size - 1:06x}",
+                size,
+                allocation,
+                symbol,
+            ])
+    write_output(CSV_OUT, buffer.getvalue())
 
 def squarify(items, x, y, width, height):
     """Return (item, x, y, width, height) rectangles using a squarified layout."""
@@ -1037,13 +1072,11 @@ def make_ram_svg(regions, entries):
     return "\n".join(svg) + "\n"
 
 if MAP_KIND == "rom":
-    with open(SVG_OUT, "w", encoding="utf-8") as stream:
-        stream.write(make_rom_svg(REGIONS, rows))
+    write_output(SVG_OUT, make_rom_svg(REGIONS, rows))
     entries = rows
     regions = REGIONS
 else:
-    with open(SVG_OUT, "w", encoding="utf-8") as stream:
-        stream.write(make_ram_svg(RAM_REGIONS, ram_rows))
+    write_output(SVG_OUT, make_ram_svg(RAM_REGIONS, ram_rows))
     entries = ram_rows
     regions = RAM_REGIONS
 

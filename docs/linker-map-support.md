@@ -43,9 +43,20 @@ distinguish initialization policy.
 
 ## cc65 (ca65/ld65)
 
-Pass an `ld65 --mapfile` map. ROM regions come from the cc65 linker-config
-`MEMORY { NAME: start = $.., size = $..; }` block, supplied via `--linker-script`
-(the `.cfg`); `rammap.py` needs no config.
+Produce a map with `ld65 --mapfile` (or `cl65 --mapfile`):
+
+```sh
+cl65 -t none -C mygame.cfg -o mygame.bin --mapfile mygame.map  main.s ...
+#   or, if you invoke the linker directly:
+ld65 -C mygame.cfg -o mygame.bin -m mygame.map  main.o ...
+
+rommap.py mygame.map --linker-script mygame.cfg
+```
+
+The `--linker-script` is your ordinary cc65 **linker config** — the same `.cfg`
+you already pass to `cl65`/`ld65` with `-C`. It is **optional**: with it, ROM
+regions are named after its `MEMORY {}` areas; without it (or for `rammap.py`),
+the map falls back to LoROM physical banks. Either way sizes stay exact.
 
 Leaves are **segments**, read from the map's `Segment list:` table (`Name`,
 `Start`, `End`, `Size`, `Align`). Sizes and free space are therefore exact, at
@@ -55,8 +66,21 @@ otherwise `allocated`.
 
 ## wla-dx and asar (symbol files)
 
-`wlalink` `.sym` files and `asar --symbols=wla|nocash` output list labels and
-their addresses only — no sizes and no memory layout. The tool therefore:
+Point the tool at the symbol file each emits:
+
+```sh
+# wla-dx: wlalink writes a WLA `.sym` ([labels]) next to the linked ROM
+wlalink -S -A linkfile.link mygame.sfc       # -> mygame.sym
+rommap.py mygame.sym
+
+# asar: choose the WLA or no$sns symbol format
+asar --symbols=wla   --symbols-path=mygame.sym  mygame.asm mygame.sfc
+asar --symbols=nocash --symbols-path=mygame.sym mygame.asm mygame.sfc
+rommap.py mygame.sym
+```
+
+No `--linker-script` is used. `.sym` files list labels and their addresses
+only — no sizes and no memory layout. The tool therefore:
 
 - assumes a LoROM physical-bank layout (bank `$xx`, offset `$8000–$FFFF`);
 - infers each label's size as the gap to the next label, sorted per bank;
@@ -65,8 +89,8 @@ their addresses only — no sizes and no memory layout. The tool therefore:
 Consequently **sizes are approximate**: trailing free space inside a bank is
 absorbed by that bank's final label, unlabeled data between labels is attributed
 to the preceding label, and the footer marks the map `(approx sizes)`. RAM
-labels are reported as `allocated`. No `--linker-script` is used. For exact
-sizes, use a linker map (ld.lld, vlink, or ld65) instead.
+labels are reported as `allocated`. For exact sizes, use a linker map (ld.lld,
+vlink, or ld65) instead.
 
 ## ROM layout assumptions
 

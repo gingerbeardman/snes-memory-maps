@@ -127,8 +127,9 @@ space-padded, and the default is a bullet (`·`), e.g. `--delimiter "/"`.
 - vbcc65816/vlink section mappings.
 - vlink LoROM, plus the vlink HiROM address projection used by `vlink-hi`.
 - cc65 ca65/ld65: the `ld65 --mapfile` **Segment list** for exact per-segment
-  sizes, with ROM regions read from the linker-config `MEMORY {}` block (pass the
-  `.cfg` as `--linker-script`).
+  sizes. Optionally pass your cc65 linker config (the same `.cfg` you build with,
+  `cl65 -C` / `ld65 -C`) as `--linker-script` to name the ROM regions; without it
+  the map falls back to physical banks.
 - wla-dx / asar symbol files (`wlalink` `.sym`, `asar --symbols=wla|nocash`):
   label→address only, so LoROM physical banks are assumed and sizes are
   **inferred** from label gaps (the last label in a bank runs to the bank end).
