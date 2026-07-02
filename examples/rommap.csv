@@ -1,0 +1,3 @@
+region,addr_start,addr_end,size,symbol
+rom,0x008000,0x008fff,4096,main
+rom,0x009000,0x00f7ff,26624,assets

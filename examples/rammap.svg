@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title description">
+<title id="title">SNES RAM MAP</title>
+<desc id="description">A true-scale overview shows all 128 KiB of WRAM in address order. Magnified panels show low WRAM and the default direct page. Colours identify allocation types; unallocated address ranges are transparent or optionally checkerboarded.</desc>
+<defs>
+  <pattern id="free-pattern" width="16" height="16" patternUnits="userSpaceOnUse">
+    <rect width="16" height="16" class="free-checker-a"/>
+    <path d="M0 0h8v8H0zM8 8h8v8H8z" class="free-checker-b"/>
+  </pattern>
+</defs>
+<rect width="1200" height="900" class="background"/>
+<text x="16" y="29" class="title">SNES RAM MAP</text>
+<text x="16" y="49" class="subtitle">true-scale 128 KiB overview · address-preserving low-WRAM and direct-page zooms</text>
+<text x="1184" y="49" text-anchor="end" class="summary">131,072 physical bytes · 356 statically reserved · <tspan>0.3%</tspan></text>
+<style>
+  :root { color-scheme: dark light; }
+  .background { fill: #10131a; }
+  .region-bg { fill: #080a0e; }
+  .free-checker-a { fill: #252b35; }
+  .free-checker-b { fill: #3a424f; }
+  .free-label { fill: #eef1f5; }
+  text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; pointer-events: none; }
+  .title { fill: #f3f6fb; font: 700 20px system-ui, sans-serif; }
+  .summary, .subtitle { fill: #8f9baa; font-size: 11px; }
+  .capacity-warning, .capacity-critical { font-weight: 800; paint-order: stroke fill; stroke: #10131a; stroke-width: 1.4px; stroke-linejoin: round; }
+  .capacity-warning { fill: #ffd166; }
+  .capacity-critical { fill: #ff6b6b; }
+  .map-label { font-weight: 650; }
+  .region-border { stroke: #ffffff; stroke-opacity: 0.24; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .item { stroke: #10131a; stroke-width: 0.6; vector-effect: non-scaling-stroke; }
+  @media (prefers-color-scheme: light) {
+    .background { fill: #f5f5f5; }
+    .region-bg { fill: #ffffff; }
+    .free-checker-a { fill: #ffffff; }
+    .free-checker-b { fill: #cccccc; }
+    .free-label { fill: #202124; }
+    .title { fill: #15171a; }
+    .summary, .subtitle { fill: #59616d; }
+    .capacity-warning { fill: #9a6700; stroke: #ffffff; }
+    .capacity-critical { fill: #b42318; stroke: #ffffff; }
+    .region-border { stroke: #000000; stroke-opacity: 0.22; }
+    .item { stroke: #ffffff; }
+  }
+</style>
+<rect class="region-border region-bg" x="16" y="62" width="374" height="813"/>
+<rect x="17.5" y="63.5" width="371" height="28.5" fill="#4c6075"/>
+<text x="23" y="83" class="map-label" font-size="12" fill="#ffffff">FULL 128 KiB · TRUE SCALE</text>
+<g><title>$7E:0000–FFFF · 356/65,536 B · 0.5% reserved</title>
+<rect class="region-border region-bg" x="17.50" y="92.00" width="184.00" height="783.00"/>
+<rect x="19.00" y="93.50" width="181.00" height="28.50" fill="#4b97dd"/>
+<text x="24.50" y="113.00" class="map-label" font-size="3.58" fill="#ffffff">$7E:0000–FFFF · 356/65,536 B</text>
+<text x="194.50" y="113.00" text-anchor="end" class="map-label" font-size="12" fill="#ffffff"><tspan>0.5% reserved</tspan></text>
+<g><title>compiler direct-page registers · $7E:0000–$7E:0003 · 4 B · compiler</title>
+<rect class="item" x="19.00" y="122.00" width="181.00" height="0.05" fill="#d85c68"/>
+</g>
+<g><title>unallocated · $7E:0004–$7E:00FF · 252 B</title>
+<rect class="item" x="19.00" y="122.05" width="181.00" height="2.89" fill="transparent"/>
+</g>
+<g><title>hardware stack (reserved) · $7E:0100–$7E:01FF · 256 B · stack</title>
+<rect class="item" x="19.00" y="124.94" width="181.00" height="2.94" fill="#e69a3a"/>
+</g>
+<g><title>state · $7E:0200–$7E:020F · 16 B · data</title>
+<rect class="item" x="19.00" y="127.87" width="181.00" height="0.18" fill="#3f8edb"/>
+</g>
+<g><title>buffer · $7E:0210–$7E:023F · 48 B · bss</title>
+<rect class="item" x="19.00" y="128.05" width="181.00" height="0.55" fill="#70b85a"/>
+</g>
+<g><title>scratch · $7E:0240–$7E:025F · 32 B · noinit</title>
+<rect class="item" x="19.00" y="128.60" width="181.00" height="0.37" fill="#a56bd4"/>
+</g>
+<g><title>unallocated · $7E:0260–$7E:FFFF · 64,928 B</title>
+<rect class="item" x="19.00" y="128.97" width="181.00" height="744.53" fill="transparent"/>
+<text x="23.00" y="503.57" class="map-label free-label" font-size="6.87" fill="#eef1f5">UNALLOCATED · $7E:0260–$7E:FFFF · 64,928 B</text>
+</g>
+</g>
+<g><title>$7F:0000–FFFF · 0/65,536 B · 0.0% reserved</title>
+<rect class="region-border region-bg" x="204.50" y="92.00" width="184.00" height="783.00"/>
+<rect x="206.00" y="93.50" width="181.00" height="28.50" fill="#c1dd4b"/>
+<text x="211.50" y="113.00" class="map-label" font-size="3.86" fill="#10131a">$7F:0000–FFFF · 0/65,536 B</text>
+<text x="381.50" y="113.00" text-anchor="end" class="map-label" font-size="12" fill="#10131a"><tspan>0.0% reserved</tspan></text>
+<g><title>unallocated · $7F:0000–$7F:FFFF · 65,536 B</title>
+<rect class="item" x="206.00" y="122.00" width="181.00" height="751.50" fill="transparent"/>
+<text x="210.00" y="500.08" class="map-label free-label" font-size="6.87" fill="#eef1f5">UNALLOCATED · $7F:0000–$7F:FFFF · 65,536 B</text>
+</g>
+</g>
+<g><title>$7E:0100–1FFF · LOW WRAM ZOOM · 352/7,936 B · 4.4% reserved</title>
+<rect class="region-border region-bg" x="398.00" y="62.00" width="786.00" height="536.00"/>
+<rect x="399.50" y="63.50" width="783.00" height="28.50" fill="#c1dd4b"/>
+<text x="405.00" y="83.00" class="map-label" font-size="12.00" fill="#10131a">$7E:0100–1FFF · LOW WRAM ZOOM · 352/7,936 B</text>
+<text x="1177.00" y="83.00" text-anchor="end" class="map-label" font-size="12" fill="#10131a"><tspan>4.4% reserved</tspan></text>
+<g><title>hardware stack (reserved) · $7E:0100–$7E:01FF · 256 B · stack</title>
+<rect class="item" x="399.50" y="92.00" width="783.00" height="16.27" fill="#e69a3a"/>
+<text x="403.50" y="103.88" class="map-label" font-size="11.00" fill="#10131a">hardware stack (reserved) · 256 B</text>
+</g>
+<g><title>state · $7E:0200–$7E:020F · 16 B · data</title>
+<rect class="item" x="399.50" y="108.27" width="783.00" height="1.02" fill="#3f8edb"/>
+</g>
+<g><title>buffer · $7E:0210–$7E:023F · 48 B · bss</title>
+<rect class="item" x="399.50" y="109.29" width="783.00" height="3.05" fill="#70b85a"/>
+</g>
+<g><title>scratch · $7E:0240–$7E:025F · 32 B · noinit</title>
+<rect class="item" x="399.50" y="112.34" width="783.00" height="2.03" fill="#a56bd4"/>
+</g>
+<g><title>unallocated · $7E:0260–$7E:1FFF · 7,584 B</title>
+<rect class="item" x="399.50" y="114.38" width="783.00" height="482.12" fill="transparent"/>
+<text x="403.50" y="359.18" class="map-label free-label" font-size="11.00" fill="#eef1f5">UNALLOCATED · $7E:0260–$7E:1FFF · 7,584 B</text>
+</g>
+</g>
+<g><title>$7E:0000–00FF · DEFAULT DIRECT PAGE (D=$0000) ZOOM · 4/256 B · 1.6% reserved</title>
+<rect class="region-border region-bg" x="398.00" y="606.00" width="786.00" height="269.00"/>
+<rect x="399.50" y="607.50" width="783.00" height="28.50" fill="#4b97dd"/>
+<text x="405.00" y="627.00" class="map-label" font-size="12.00" fill="#ffffff">$7E:0000–00FF · DEFAULT DIRECT PAGE (D=$0000) ZOOM · 4/256 B</text>
+<text x="1177.00" y="627.00" text-anchor="end" class="map-label" font-size="12" fill="#ffffff"><tspan>1.6% reserved</tspan></text>
+<g><title>compiler direct-page registers · $7E:0000–$7E:0003 · 4 B · compiler</title>
+<rect class="item" x="399.50" y="636.00" width="783.00" height="3.71" fill="#d85c68"/>
+</g>
+<g><title>unallocated · $7E:0004–$7E:00FF · 252 B</title>
+<rect class="item" x="399.50" y="639.71" width="783.00" height="233.79" fill="transparent"/>
+<text x="403.50" y="760.35" class="map-label free-label" font-size="11.00" fill="#eef1f5">UNALLOCATED · $7E:0004–$7E:00FF · 252 B</text>
+</g>
+</g>
+<text x="16" y="891" class="subtitle">Generated by rammap.py · compiler: llvm-mos/ld.lld · source: game.map</text>
+</svg>

@@ -1,0 +1,6 @@
+region,addr_start,addr_end,size,allocation,symbol
+direct_page,0x7e0000,0x7e0003,4,compiler,compiler direct-page registers
+low_wram,0x7e0100,0x7e01ff,256,stack,hardware stack (reserved)
+low_wram,0x7e0200,0x7e020f,16,data,state
+low_wram,0x7e0210,0x7e023f,48,bss,buffer
+low_wram,0x7e0240,0x7e025f,32,noinit,scratch

@@ -1,0 +1,6 @@
+Section mapping (numbers in hex):
+  00008000 - 00009000  1000  1 fixture.o(1_text.main)
+  00009000 - 0000f800  6800  1 fixture.o(1_rodata.assets)
+  00000200 - 00000210    10  1 fixture.o(1_ndata.state)
+  00000210 - 00000240    30  1 fixture.o(1_nbss.buffer)
+Symbols of a.out:

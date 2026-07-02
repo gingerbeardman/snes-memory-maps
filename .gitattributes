@@ -1,0 +1,3 @@
+* text=auto eol=lf
+examples/*.svg linguist-generated=true
+examples/*.csv linguist-generated=true
